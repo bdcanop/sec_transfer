@@ -1,0 +1,15 @@
+.formulario {
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.boton-enviar {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+

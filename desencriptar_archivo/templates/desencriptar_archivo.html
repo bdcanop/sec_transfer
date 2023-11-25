@@ -1,0 +1,30 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desencriptar Archivo</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'desencriptar_archivo/style.css' %}">
+</head>
+<body>
+    <div class="container">
+        <h2>Desencriptar Archivo</h2>
+
+        {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                    <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data" class="formulario">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit" class="boton-desencriptar">Desencriptar Archivo</button>
+        </form>
+    </div>
+</body>
+</html>
