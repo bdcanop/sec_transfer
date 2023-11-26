@@ -6,12 +6,58 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 import os
+from io import BytesIO
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 from cryptography.hazmat.primitives import hashes
+
+def generar_clave_derivada(clave, salt):
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        iterations=100000,
+        salt=salt,
+        length=32,
+        backend=default_backend()
+    )
+    return kdf.derive(clave.encode())
+
+def encriptar_archivo(archivo, clave_derivada):
+    iv = os.urandom(16)
+
+    cipher = Cipher(algorithms.AES(clave_derivada), modes.CFB(iv), backend=default_backend())
+    encryptor = cipher.encryptor()
+
+    plaintext = archivo.read()
+    ciphertext = encryptor.update(plaintext) + encryptor.finalize()
+
+    return iv, ciphertext
+
+def generate_key(password, salt):
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+        backend=default_backend()
+    )
+    key = kdf.derive(password.encode())
+    return key
+
+def encrypt_file_data(file_data, password):
+    salt = os.urandom(16)
+    key = generate_key(password, salt)
+    iv = os.urandom(16)
+
+    cipher = Cipher(algorithms.AES(key), modes.CFB(iv), backend=default_backend())
+    encryptor = cipher.encryptor()
+    ciphertext = encryptor.update(file_data) + encryptor.finalize()
+
+    encrypted_data = salt + iv + ciphertext
+    return encrypted_data
+
 
 def enviar_correo_view(request):
     if request.method == 'POST':
@@ -26,46 +72,20 @@ def enviar_correo_view(request):
             smtp_username = 'bryandaniel1507@gmail.com'
             smtp_password = os.environ.get('EMAIL_BRYAN1507_PASSWORD')
             from_email = 'bryandaniel1507@gmail.com'
+            file_data = archivo_encriptado.read()
+            encrypted_data = encrypt_file_data(file_data, clave_encriptacion)
 
-            ####################################################
-            salt = os.urandom(16)
-            kdf = PBKDF2HMAC(
-                algorithm=hashes.SHA256(),
-                iterations=100000,
-                salt=salt,
-                length=32,
-                backend=default_backend()
-            )
-            key = kdf.derive(clave_encriptacion.encode())
-
-            # Generar un vector de inicialización aleatorio
-            iv = os.urandom(16)
-
-            # Configurar el cifrado AES en modo CBC
-            cipher = Cipher(algorithms.AES(key), modes.CFB(iv), backend=default_backend())
-            encryptor = cipher.encryptor()
-
-            plaintext = archivo_encriptado.read()
-            ciphertext = encryptor.update(plaintext) + encryptor.finalize()
-            ####################################################
-            
             msg = MIMEMultipart()
             msg['From'] = from_email
             msg['To'] = destinatario
             msg['Subject'] = asunto
             msg.attach(MIMEText(clave_encriptacion, 'plain'))
 
-            # Leer el contenido del archivo encriptado
-            archivo_contenido = (salt + iv + ciphertext)
-
-            # Crear el objeto MIME para el archivo adjunto
-            archivo_adjunto = MIMEBase('application', 'octet-stream')
-            archivo_adjunto.set_payload(archivo_contenido)
-            encoders.encode_base64(archivo_adjunto)
-            archivo_adjunto.add_header('Content-Disposition', f'attachment; filename={archivo_encriptado.name}')
-
-            # Adjuntar el objeto MIME al mensaje
-            msg.attach(archivo_adjunto)
+            attachment = MIMEBase('application', 'octet-stream')
+            attachment.set_payload(encrypted_data)
+            encoders.encode_base64(attachment)
+            attachment.add_header('Content-Disposition', f'attachment; filename={archivo_encriptado.name}')
+            msg.attach(attachment)
 
             with smtplib.SMTP(smtp_server, smtp_port) as server:
                 server.starttls()

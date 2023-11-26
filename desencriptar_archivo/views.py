@@ -5,6 +5,39 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
+from io import BytesIO
+
+def generate_key(password, salt):
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+        backend=default_backend()
+    )
+    key = kdf.derive(password.encode())
+    return key
+
+
+def decrypt_file_data(file_data, password):
+    # Leer los bytes del archivo
+    data = file_data.read()
+
+    # Separar el salt, iv y ciphertext
+    salt = data[:16]
+    iv = data[16:32]
+    ciphertext = data[32:]
+
+    # Generar la clave
+    key = generate_key(password, salt)
+
+    # Configurar el cifrado y descifrar los datos
+    cipher = Cipher(algorithms.AES(key), modes.CFB(iv), backend=default_backend())
+    decryptor = cipher.decryptor()
+    plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+
+    return plaintext
+
 
 def desencriptar_archivo_view(request):
     if request.method == 'POST':
@@ -13,37 +46,15 @@ def desencriptar_archivo_view(request):
             archivo_encriptado = form.cleaned_data['archivo_encriptado']
             clave_desencriptacion = form.cleaned_data['clave_desencriptacion']
 
-            data = archivo_encriptado.read()
-
-            # Extraer el salt, IV y el texto cifrado
-            salt = data[:16]
-            iv = data[16:32]
-            ciphertext = data[32:]
-
-            # Derivar la clave de la contraseña y el salt usando PBKDF2
-            kdf = PBKDF2HMAC(
-                algorithm=hashes.SHA256(),
-                iterations=100000,
-                salt=salt,
-                length=32,
-                backend=default_backend()
-            )
-            key = kdf.derive(clave_desencriptacion.encode())
-
-            # Configurar el cifrado AES en modo CBC
-            cipher = Cipher(algorithms.AES(key), modes.CFB(iv), backend=default_backend())
-            decryptor = cipher.decryptor()
-
-            # Desencriptar el texto cifrado
-            decrypted_text = decryptor.update(ciphertext) + decryptor.finalize()
+            # decrypted_content = desencriptar_archivo(archivo_encriptado, clave_desencriptacion)
+            decrypted_data = decrypt_file_data(archivo_encriptado, clave_desencriptacion)
 
             # Crear una respuesta de archivo y configurar su contenido
-            response = HttpResponse(decrypted_text, content_type='application/octet-stream')
-            response['Content-Disposition'] = 'attachment; filename="archivo_desencriptado.txt"'
+            response = HttpResponse(decrypted_data, content_type='application/octet-stream')
+            response['Content-Disposition'] = f'attachment; filename="{archivo_encriptado.name}"'
 
             return response
     else:
         form = ArchivoDesencriptadoForm()
 
     return render(request, 'desencriptar_archivo.html', {'form': form})
-
