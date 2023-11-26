@@ -58,7 +58,7 @@ def enviar_correo_view(request):
             msg['From'] = from_email
             msg['To'] = destinatario
             msg['Subject'] = asunto
-            msg.attach(MIMEText(clave_encriptacion, 'plain'))
+            # msg.attach(MIMEText(clave_encriptacion, 'plain'))
 
             attachment = MIMEBase('application', 'octet-stream')
             attachment.set_payload(encrypted_data)
@@ -70,6 +70,19 @@ def enviar_correo_view(request):
                 server.starttls()
                 server.login(smtp_username, smtp_password)
                 server.send_message(msg)
+
+            msg2 = MIMEMultipart()
+            msg2['From'] = from_email
+            msg2['To'] = destinatario
+            msg2['Subject'] = 'Clave de desencriptación'
+            mensaje_clave = f"""Para desencriptar el archivo que se le envió debe visitar la página http://127.0.0.1:8000/desencriptar-archivo/
+            En ella debe ingresar el archivo encriptado junto con la clave: -> {clave_encriptacion} <- en los campos correspondientes"""
+            msg2.attach(MIMEText(mensaje_clave, 'plain'))
+
+            with smtplib.SMTP(smtp_server, smtp_port) as server2:
+                server2.starttls()
+                server2.login(smtp_username, smtp_password)
+                server2.send_message(msg2)
             
             messages.success(request, 'Correo encriptado y enviado con éxito.')
             return redirect('enviar_correo') 
