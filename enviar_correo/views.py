@@ -14,27 +14,6 @@ from email.mime.base import MIMEBase
 from email import encoders
 from cryptography.hazmat.primitives import hashes
 
-def generar_clave_derivada(clave, salt):
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        iterations=100000,
-        salt=salt,
-        length=32,
-        backend=default_backend()
-    )
-    return kdf.derive(clave.encode())
-
-def encriptar_archivo(archivo, clave_derivada):
-    iv = os.urandom(16)
-
-    cipher = Cipher(algorithms.AES(clave_derivada), modes.CFB(iv), backend=default_backend())
-    encryptor = cipher.encryptor()
-
-    plaintext = archivo.read()
-    ciphertext = encryptor.update(plaintext) + encryptor.finalize()
-
-    return iv, ciphertext
-
 def generate_key(password, salt):
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
